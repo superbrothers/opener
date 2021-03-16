@@ -1,5 +1,7 @@
 # opener
 
+![Logo](./sennuki.png)
+
 Open URL in your local web browser from the SSH-connected remote environment.
 
 ## How does opener work?
