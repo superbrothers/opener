@@ -2,12 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/mitchellh/go-homedir"
@@ -93,6 +95,34 @@ func (o *OpenerOptions) Run() error {
 	return nil
 }
 
+var browserMu sync.Mutex
+
+func openURL(line string) (string, error) {
+	// We try out best avoiding race-condition on swapping browser.{Stdout,Stderr}.
+	// This works in a case when there are two or more consumers exist for this package.
+	//
+	// Fingers-crossed when github.com/pkg/browser is used concurrently outside of this package...
+	browserMu.Lock()
+
+	stdout, stderr := browser.Stdout, browser.Stderr
+
+	defer func() {
+		browser.Stdout = stdout
+		browser.Stderr = stderr
+
+		browserMu.Unlock()
+	}()
+
+	var buf bytes.Buffer
+
+	browser.Stdout = &buf
+	browser.Stderr = &buf
+
+	err := browser.OpenURL(line)
+
+	return buf.String(), err
+}
+
 func handleConnection(conn net.Conn, errOut io.Writer) {
 	defer conn.Close()
 
@@ -106,8 +136,23 @@ func handleConnection(conn net.Conn, errOut io.Writer) {
 		}
 	}
 
-	if err := browser.OpenURL(line); err != nil {
+	logs, err := openURL(line)
+
+	if logs != "" {
+		fmt.Fprint(os.Stderr, logs)
+	}
+
+	if err != nil {
 		fmt.Fprintf(errOut, "failed to open %q: %v\n", line, err)
+
+		// Send back the logs from `open` to the client over e.g. the unix domain socket, so that
+		// `open` on the client machine would work more like that on the server.
+		//
+		// Note that this works only when the client selected the protocol of SOCK_STREAM rather than e.g. SOCK_DGRAM.
+		// `socat`, for example, negotiates the protocol to prefer SOCK_STREAM so you won't usually care.
+		if _, err := conn.Write([]byte(logs)); err != nil {
+			fmt.Fprintf(errOut, "failed to send error to client: %v\n", err)
+		}
 		return
 	}
 }
