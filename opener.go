@@ -97,7 +97,7 @@ func (o *OpenerOptions) Run() error {
 
 var browserMu sync.Mutex
 
-func openURL(line string) (string, error) {
+var openURL = func(line string) (string, error) {
 	// We try out best avoiding race-condition on swapping browser.{Stdout,Stderr}.
 	// This works in a case when there are two or more consumers exist for this package.
 	//
@@ -139,7 +139,7 @@ func handleConnection(conn net.Conn, errOut io.Writer) {
 	logs, err := openURL(line)
 
 	if logs != "" {
-		fmt.Fprint(os.Stderr, logs)
+		fmt.Fprint(errOut, logs)
 	}
 
 	if err != nil {
