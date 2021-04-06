@@ -46,6 +46,10 @@ func TestHandleConnection(t *testing.T) {
 			}
 
 			res, err := bufio.NewReader(client).ReadString('\n')
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			if tc.res != res {
 				t.Errorf("expect %q, but actual %q", tc.res, res)
 			}
