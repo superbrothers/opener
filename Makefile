@@ -19,6 +19,10 @@ $(GORELEASER): $(TOOLS_DIR)/go.mod
 build-cross: $(GORELEASER)
 	$(GORELEASER) build --snapshot --rm-dist
 
+.PHONY: test
+test:
+	$(GO) test -v ./...
+
 .PHONY: vet
 vet:
 	$(GO) vet ./...
