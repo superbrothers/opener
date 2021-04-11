@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"io"
 	"net"
@@ -12,14 +11,24 @@ func TestHandleConnection(t *testing.T) {
 	tt := []struct {
 		test        string
 		openURLFunc func(string) (string, error)
-		res         string
+		data        string
+		err         error
 	}{
 		{
-			"Sending back the logs",
+			"Say nothing when successful",
+			func(line string) (string, error) {
+				return "pong\n", nil
+			},
+			"",
+			io.EOF,
+		},
+		{
+			"Sending back the logs when failure",
 			func(line string) (string, error) {
 				return "pong\n", errors.New("exit status 1")
 			},
 			"pong\n",
+			nil,
 		},
 	}
 
@@ -45,13 +54,15 @@ func TestHandleConnection(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			res, err := bufio.NewReader(client).ReadString('\n')
-			if err != nil {
-				t.Fatal(err)
+			buf := make([]byte, 1024)
+			n, err := client.Read(buf)
+			data := string(buf[:n])
+			if tc.data != data {
+				t.Errorf("expect %q, but actual %q", tc.data, data)
 			}
 
-			if tc.res != res {
-				t.Errorf("expect %q, but actual %q", tc.res, res)
+			if tc.err != err {
+				t.Errorf("expect %v, but actual %v", tc.err, err)
 			}
 		})
 	}
