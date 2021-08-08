@@ -2,8 +2,6 @@ before:
   hooks:
   - go mod tidy
 project_name: opener
-env:
-- GOPROXY=https://gocenter.io
 builds:
 - env:
   - CGO_ENABLED=0

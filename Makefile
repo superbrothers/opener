@@ -1,6 +1,6 @@
 NAME := opener
 DIST_DIR := dist
-GO ?= GOPROXY=https://gocenter.io go
+GO ?= go
 VERSION ?= $(shell git describe --tags --always --dirty)
 
 .PHONY: build
