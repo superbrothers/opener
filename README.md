@@ -25,8 +25,8 @@ You remotely forward the socket file of the opener daemon, `~/.opener.sock`, whe
 │ │ ~/.opener.sock │ ├─────────────────► │ ~/.opener.sock │ │
 │ └────────────────┘ │ Remote forward  │ └────────────────┘ │
 │                    │                 │                    │
+│      localhost     │                 │    remote server   │
 └────────────────────┘                 └────────────────────┘
-       localhost                            remote server
 ```
 
 ## Setup
@@ -86,6 +86,68 @@ If set up correctly, the following command in a remote environment will send the
 
 ```
 $ open https://www.google.com/
+```
+
+## Configuration
+
+You can configure opener with a config file. By default, it should be located at `~/.config/opener/config.yaml`. You can also specify a config file with `--config` option.
+
+```yaml
+# The network to use opener daemon.
+# Allowed networks are: unix or tcp. (defaults to unix)
+network: unix
+
+# The address to listen on. (defaults to ~/.opener.sock)
+address: ~/.opener.sock
+```
+
+### Example: Open a URL from inside a container on macOS
+
+If you want to open a URL from inside a container on macOS, you can use `tcp` network instead of `unix`.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│ ┌────────────────┐                                      │
+│ │   Web Browser  │                                      │
+│ └─▲──────────────┘                 ┌──────────────────┐ │
+│   │                                │     container    │ │
+│   │ Open URL                       │                  │ │
+│   │                                │ ┌──────────────┐ │ │
+│ ┌─┴──────────────┐    Send a URL   │ │ open command │ │ │
+│ │  opener daemon │◄────────────────┼─┤    (fake)    │ │ │
+│ └────────────────┘   (TCP request) │ └──────────────┘ │ │
+│   127.0.0.1:9999                   │                  │ │
+│                                    └──────────────────┘ │
+│                       localhost                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+Create the following config at `~/.config/opener/config.yaml`:
+
+```yaml
+network: tcp
+address: 127.0.0.1:9999
+```
+
+Restart the opener daemon:
+
+```
+$ brew services restart opener
+```
+
+Send a URL to the opener daemon from inside a container:
+
+```
+$ docker run --rm -it busybox /bin/sh
+# echo https://www.google.com/ | nc host.docker.internal 9999
+```
+
+The following script is useful as a fake `open` command.
+
+```sh
+#!/bin/sh
+echo "$@" | nc host.docker.internal 9999
 ```
 
 ## License

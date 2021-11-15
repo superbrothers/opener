@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -22,13 +23,17 @@ var commit string
 var date string
 
 type OpenerOptions struct {
-	Address string
+	Network string `yaml:"network"`
+	Address string `yaml:"address"`
 
 	ErrOut io.Writer
 }
 
 func NewOpenerCmd(errOut io.Writer) *cobra.Command {
+	var configPath string
+
 	o := &OpenerOptions{
+		Network: "unix",
 		Address: "~/.opener.sock",
 		ErrOut:  errOut,
 	}
@@ -36,6 +41,10 @@ func NewOpenerCmd(errOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "opener",
 		RunE: func(_ *cobra.Command, args []string) error {
+			if err := LoadOpenerOptionsFromConfig(configPath, o); err != nil {
+				return err
+			}
+
 			if err := o.Validate(); err != nil {
 				return err
 			}
@@ -44,31 +53,38 @@ func NewOpenerCmd(errOut io.Writer) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVar(&configPath, "config", configPath, "Path to the opener config file (defaults to ~/.config/opener/config.yaml)")
+
 	return cmd
 }
 
 func (o *OpenerOptions) Validate() error {
-	address, err := homedir.Expand(o.Address)
-	if err != nil {
-		return err
+	switch o.Network {
+	case "unix":
+		address, err := homedir.Expand(o.Address)
+		if err != nil {
+			return err
+		}
+		o.Address = address
+
+		syscall.Umask(0077)
+
+		if err := os.RemoveAll(o.Address); err != nil {
+			return err
+		}
+	case "tcp":
+	default:
+		return errors.New("allowd network are: unix,tcp")
 	}
-	o.Address = address
 
 	return nil
 }
 
 func (o *OpenerOptions) Run() error {
 	fmt.Fprintf(o.ErrOut, "version: %s, commit: %s, date: %s\n", version, commit, date)
+	fmt.Fprintf(o.ErrOut, "starting a server at %s\n", o.Address)
 
-	syscall.Umask(0077)
-
-	if err := os.RemoveAll(o.Address); err != nil {
-		return err
-	}
-
-	fmt.Fprintf(o.ErrOut, "starting UNIX domain socket server at %s\n", o.Address)
-
-	ln, err := net.Listen("unix", o.Address)
+	ln, err := net.Listen(o.Network, o.Address)
 	if err != nil {
 		return err
 	}
