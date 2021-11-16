@@ -74,7 +74,7 @@ func (o *OpenerOptions) Validate() error {
 		}
 	case "tcp":
 	default:
-		return errors.New("allowd network are: unix,tcp")
+		return errors.New("allowed network are: unix,tcp")
 	}
 
 	return nil
