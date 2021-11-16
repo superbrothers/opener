@@ -38,7 +38,7 @@ func TestOpenerOptionsValidate(t *testing.T) {
 				Network: "udp",
 				Address: "127.0.0.1:8888",
 			},
-			"allowd network are: unix,tcp",
+			"allowed network are: unix,tcp",
 		},
 	}
 
