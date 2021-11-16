@@ -7,6 +7,54 @@ import (
 	"testing"
 )
 
+func TestOpenerOptionsValidate(t *testing.T) {
+	tt := []struct {
+		test        string
+		o           *OpenerOptions
+		expectedErr string
+	}{
+		{
+			"unix domain socket can be used",
+			&OpenerOptions{
+				Network: "unix",
+				Address: "opener.sock",
+			},
+			"",
+		},
+		{
+			"tcp can be used",
+			&OpenerOptions{
+				Network: "tcp",
+				Address: "127.0.0.1:8888",
+			},
+			"",
+		},
+		{
+			"udp cannot be used",
+			&OpenerOptions{
+				Network: "udp",
+				Address: "127.0.0.1:8888",
+			},
+			"allowd network are: unix,tcp",
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.test, func(t *testing.T) {
+			err := tc.o.Validate()
+			if err == nil {
+				if tc.expectedErr != "" {
+					t.Errorf("expect err nil, but actual %q", err)
+				}
+			} else {
+				if tc.expectedErr != err.Error() {
+					t.Errorf("expect err %q, but actual %q", tc.expectedErr, err)
+				}
+			}
+		})
+	}
+}
+
 func TestHandleConnection(t *testing.T) {
 	tt := []struct {
 		test        string
