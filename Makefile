@@ -31,7 +31,7 @@ vet:
 fmt:
 	$(GO) fmt ./...
 
-GOLANGCI_LINT_VERSION ?= v1.39.0
+GOLANGCI_LINT_VERSION ?= v1.43.0
 .PHONY: lint
 lint: vet fmt
 	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) golangci-lint run
