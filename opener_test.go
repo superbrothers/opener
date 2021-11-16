@@ -2,8 +2,11 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"math/rand"
 	"net"
+	"path/filepath"
 	"testing"
 )
 
@@ -17,7 +20,7 @@ func TestOpenerOptionsValidate(t *testing.T) {
 			"unix domain socket can be used",
 			&OpenerOptions{
 				Network: "unix",
-				Address: "opener.sock",
+				Address: filepath.Join("/", "tmp", fmt.Sprintf("%03d", rand.Intn(1000)), "opener.sock"),
 			},
 			"",
 		},

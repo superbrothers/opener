@@ -3,9 +3,12 @@ DIST_DIR := dist
 GO ?= go
 VERSION ?= $(shell git describe --tags --always --dirty)
 
+PLATFORM ?= local
+DOCKER ?= DOCKER_BUILDKIT=1 docker
+
 .PHONY: build
 build:
-	$(GO) build -o $(DIST_DIR)/$(NAME) .
+	$(DOCKER) build --target bin --output $(DIST_DIR) --platform $(PLATFORM) .
 
 TOOLS_DIR := hack/tools
 TOOLS_BIN_DIR := $(TOOLS_DIR)/bin
@@ -21,20 +24,11 @@ build-cross: $(GORELEASER)
 
 .PHONY: test
 test:
-	$(GO) test -v ./...
+	$(DOCKER) build --target test .
 
-.PHONY: vet
-vet:
-	$(GO) vet ./...
-
-.PHONY: fmt
-fmt:
-	$(GO) fmt ./...
-
-GOLANGCI_LINT_VERSION ?= v1.43.0
 .PHONY: lint
-lint: vet fmt
-	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) golangci-lint run
+lint:
+	$(DOCKER) build --target lint .
 
 .PHONY: dist
 dist: $(GORELEASER)
