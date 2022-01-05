@@ -36,7 +36,7 @@ You remotely forward the socket file of the opener daemon, `~/.opener.sock`, whe
 You can install opener with Homebrew. Since opener is a daemon, it is managed by Homebrew-services.
 
 ```
-$ brew install superbrothers/opener
+$ brew install superbrothers/opener/opener
 $ brew services start opener
 ```
 
