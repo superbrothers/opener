@@ -64,11 +64,11 @@ $ echo 'export PATH="$HOME/bin:$PATH"' >>~/.bashrc
 $ source ~/.bashrc
 ```
 
-Fake commands use `socat` command, so install it.
+Fake commands use `nc` command, so install it if you don't have it.
 
 ```sh
 # Ubuntu 20.04
-$ sudo apt install socat
+$ sudo apt install netcat
 ```
 
 Add the following settings to sshd. This is an option to delete the socket file when you lose the connection to the remote environment.
