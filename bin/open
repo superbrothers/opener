@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-echo "${@}" | socat - "UNIX-CLIENT:$HOME/.opener.sock"
+echo "${@}" | nc -U "$HOME/.opener.sock"
