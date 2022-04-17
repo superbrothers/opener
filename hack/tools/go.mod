@@ -1,6 +1,6 @@
 module github.com/superbrothers/opener/hack/tools
 
-go 1.17
+go 1.18
 
 require github.com/goreleaser/goreleaser v1.0.0
 
