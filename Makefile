@@ -10,13 +10,14 @@ DOCKER ?= DOCKER_BUILDKIT=1 docker
 build:
 	$(DOCKER) build --target bin --output $(DIST_DIR) --platform $(PLATFORM) .
 
-TOOLS_DIR := hack/tools
-TOOLS_BIN_DIR := $(TOOLS_DIR)/bin
-GORELEASER_BIN := bin/goreleaser
-GORELEASER := $(TOOLS_DIR)/$(GORELEASER_BIN)
+TOOLS_BIN_DIR := $(CURDIR)/hack/tools/bin
+$(shell mkdir -p $(TOOLS_BIN_DIR))
 
-$(GORELEASER): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR) && $(GO) build -o $(GORELEASER_BIN) github.com/goreleaser/goreleaser
+GORELEASER_VERSION ?= v1.9.2
+GORELEASER := $(TOOLS_BIN_DIR)/goreleaser
+
+$(GORELEASER):
+	GOBIN=$(TOOLS_BIN_DIR) $(GO) install github.com/goreleaser/goreleaser@$(GORELEASER_VERSION)
 
 .PHONY: build-cross
 build-cross: $(GORELEASER)
