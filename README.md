@@ -101,9 +101,9 @@ network: unix
 address: ~/.opener.sock
 ```
 
-### Example: Open a URL from inside a container on macOS
+### Example: Open a URL from inside a container
 
-If you want to open a URL from inside a container on macOS, you can use `tcp` network instead of `unix`.
+If you want to open a URL from inside a container, you can use `tcp` network instead of `unix`.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
