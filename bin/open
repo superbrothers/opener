@@ -1,3 +1,7 @@
 #!/usr/bin/env bash
 
-echo "${@}" | nc -U "$HOME/.opener.sock"
+if [ -p /dev/stdin ]; then
+    cat - | nc -U "$HOME/.opener.sock"
+else
+    echo "${@}" | nc -U "$HOME/.opener.sock"
+fi
