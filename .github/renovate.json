@@ -1,7 +1,7 @@
 {
   "extends": ["config:base"],
   "labels": ["renovate"],
-  "enabledManagers": ["dockerfile", "regex"],
+  "enabledManagers": ["dockerfile", "regex", "github-actions"],
   "regexManagers": [
     {
       "fileMatch": ["(^|/)Makefile$"],
