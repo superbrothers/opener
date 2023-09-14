@@ -1,7 +1,14 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-if [ -p /dev/stdin ]; then
-    cat - | nc -U "$HOME/.opener.sock"
+set -eu
+
+# get data either form stdin or from file
+if (( $# == 0 )) ; then
+  # if no argument, read from standard input from pipe
+  buf=$(cat "$@")
 else
-    echo "${@}" | nc -U "$HOME/.opener.sock"
+  # otherwise read from all arguments
+  buf=$@
 fi
+
+echo "$buf" | nc -U "$HOME/.opener.sock"
