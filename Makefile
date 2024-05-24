@@ -14,7 +14,7 @@ TOOLS_BIN_DIR := $(CURDIR)/hack/tools/bin
 $(shell mkdir -p $(TOOLS_BIN_DIR))
 
 # renovate: datasource=github-releases depName=goreleaser/goreleaser
-GORELEASER_VERSION ?= v1.17.2
+GORELEASER_VERSION ?= v1.26.2
 GORELEASER := $(TOOLS_BIN_DIR)/goreleaser
 
 $(GORELEASER):
