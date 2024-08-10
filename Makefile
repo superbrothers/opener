@@ -14,15 +14,15 @@ TOOLS_BIN_DIR := $(CURDIR)/hack/tools/bin
 $(shell mkdir -p $(TOOLS_BIN_DIR))
 
 # renovate: datasource=github-releases depName=goreleaser/goreleaser
-GORELEASER_VERSION ?= v1.17.2
+GORELEASER_VERSION ?= v2.1.0
 GORELEASER := $(TOOLS_BIN_DIR)/goreleaser
 
 $(GORELEASER):
-	GOBIN=$(TOOLS_BIN_DIR) $(GO) install github.com/goreleaser/goreleaser@$(GORELEASER_VERSION)
+	GOBIN=$(TOOLS_BIN_DIR) $(GO) install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
 
 .PHONY: build-cross
 build-cross: $(GORELEASER)
-	$(GORELEASER) build --snapshot --rm-dist
+	$(GORELEASER) build --snapshot --clean
 
 .PHONY: test
 test:
@@ -34,11 +34,11 @@ lint:
 
 .PHONY: dist
 dist: $(GORELEASER)
-	$(GORELEASER) release --rm-dist --skip-publish --snapshot
+	$(GORELEASER) release --clean --skip=publish --snapshot
 
 .PHONY: release
 release: $(GORELEASER)
-	$(GORELEASER) release --rm-dist --skip-validate
+	$(GORELEASER) release --clean --skip=validate
 
 .PHONY: clean
 clean: clean-tools clean-dist

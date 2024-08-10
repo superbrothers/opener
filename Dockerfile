@@ -1,5 +1,4 @@
-# syntax = docker/dockerfile:1-experimental
-FROM --platform=${BUILDPLATFORM} golang:1.21 AS base
+FROM --platform=${BUILDPLATFORM} golang:1.22 AS base
 WORKDIR /src
 ENV CGO_ENABLED=0
 COPY go.* .
@@ -20,7 +19,7 @@ RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     go test -v ./...
 
-FROM golangci/golangci-lint:v1.52.2 AS lint-base
+FROM golangci/golangci-lint:v1.59.1 AS lint-base
 FROM base AS lint
 RUN --mount=target=. \
     --mount=from=lint-base,src=/usr/bin/golangci-lint,target=/usr/bin/golangci-lint \
