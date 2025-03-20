@@ -15,7 +15,8 @@ builds:
   - arm64
 archives:
 - name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
-  format: zip
+  formats:
+  - zip
   files:
   - LICENSE
   - README.md
