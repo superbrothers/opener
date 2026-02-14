@@ -92,7 +92,7 @@ func TestHandleConnection(t *testing.T) {
 
 			go func() {
 				conn, _ := ln.Accept()
-				go handleConnection(conn, io.Discard)
+				go handleConnection(conn, io.Discard, nil)
 			}()
 
 			client, err := net.Dial("tcp", ln.Addr().String())

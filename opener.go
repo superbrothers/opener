@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,21 +13,27 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 )
 
-var version string
-var commit string
-var date string
+var (
+	version string
+	commit  string
+	date    string
+)
 
 type OpenerOptions struct {
-	Network string `yaml:"network"`
-	Address string `yaml:"address"`
+	Network       string `json:"network"`
+	Address       string `json:"address"`
+	ControlSocket string `json:"control-socket"`
+	ForwardTTLRaw string `json:"forward-ttl"`
 
-	ErrOut io.Writer
+	ForwardTTL time.Duration
+	ErrOut     io.Writer
 }
 
 func NewOpenerCmd(errOut io.Writer) *cobra.Command {
@@ -77,6 +84,25 @@ func (o *OpenerOptions) Validate() error {
 		return errors.New("allowed network are: unix,tcp")
 	}
 
+	if o.ControlSocket != "" {
+		expanded, err := homedir.Expand(o.ControlSocket)
+		if err != nil {
+			return err
+		}
+		o.ControlSocket = expanded
+
+		if o.ForwardTTLRaw != "" {
+			d, err := time.ParseDuration(o.ForwardTTLRaw)
+			if err != nil {
+				return fmt.Errorf("invalid forward-ttl %q: %w", o.ForwardTTLRaw, err)
+			}
+			o.ForwardTTL = d
+		}
+		if o.ForwardTTL == 0 {
+			o.ForwardTTL = time.Minute
+		}
+	}
+
 	return nil
 }
 
@@ -91,6 +117,15 @@ func (o *OpenerOptions) Run() error {
 
 	defer ln.Close()
 
+	var ft *forwardTracker
+	if o.ControlSocket != "" {
+		fmt.Fprintf(o.ErrOut, "Starting auto socket forwarder. ControlSocket: %q, forward-ttl: %q\n", o.ControlSocket, o.ForwardTTL)
+		ctx, cancel := context.WithCancel(context.Background())
+		ft = newForwardTracker(o.ControlSocket, o.ForwardTTL, o.ErrOut)
+		go ft.run(ctx)
+		defer cancel()
+	}
+
 	go func() {
 		for {
 			conn, err := ln.Accept()
@@ -99,7 +134,7 @@ func (o *OpenerOptions) Run() error {
 				return
 			}
 
-			go handleConnection(conn, o.ErrOut)
+			go handleConnection(conn, o.ErrOut, ft)
 		}
 	}()
 
@@ -139,7 +174,7 @@ var openURL = func(line string) (string, error) {
 	return buf.String(), err
 }
 
-func handleConnection(conn net.Conn, errOut io.Writer) {
+func handleConnection(conn net.Conn, errOut io.Writer, tracker *forwardTracker) {
 	defer conn.Close()
 
 	line, err := bufio.NewReader(conn).ReadString('\n')
@@ -149,6 +184,13 @@ func handleConnection(conn net.Conn, errOut io.Writer) {
 		if err != io.EOF {
 			fmt.Fprintln(errOut, err)
 			return
+		}
+	}
+
+	if tracker != nil {
+		if port, ok := shouldForward(line); ok {
+			fmt.Fprintf(errOut, "opener: detected localhost port %q, requesting forward\n", port)
+			tracker.forward(port)
 		}
 	}
 
