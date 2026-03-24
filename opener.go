@@ -29,8 +29,8 @@ var (
 type OpenerOptions struct {
 	Network       string `json:"network"`
 	Address       string `json:"address"`
-	ControlSocket string `json:"control-socket"`
-	ForwardTTLRaw string `json:"forward-ttl"`
+	ControlSocket string `json:"auto-forward-control-socket"`
+	ForwardTTLRaw string `json:"auto-forward-ttl"`
 
 	ForwardTTL time.Duration
 	ErrOut     io.Writer
@@ -94,7 +94,7 @@ func (o *OpenerOptions) Validate() error {
 		if o.ForwardTTLRaw != "" {
 			d, err := time.ParseDuration(o.ForwardTTLRaw)
 			if err != nil {
-				return fmt.Errorf("invalid forward-ttl %q: %w", o.ForwardTTLRaw, err)
+				return fmt.Errorf("invalid auto-forward-ttl %q: %w", o.ForwardTTLRaw, err)
 			}
 			o.ForwardTTL = d
 		}
@@ -119,7 +119,7 @@ func (o *OpenerOptions) Run() error {
 
 	var ft *forwardTracker
 	if o.ControlSocket != "" {
-		fmt.Fprintf(o.ErrOut, "Starting auto socket forwarder. ControlSocket: %q, forward-ttl: %q\n", o.ControlSocket, o.ForwardTTL)
+		fmt.Fprintf(o.ErrOut, "Starting auto socket forwarder. auto-forward-control-socket: %q, auto-forward-ttl: %q\n", o.ControlSocket, o.ForwardTTL)
 		ctx, cancel := context.WithCancel(context.Background())
 		ft = newForwardTracker(o.ControlSocket, o.ForwardTTL, o.ErrOut)
 		go ft.run(ctx)
@@ -189,7 +189,6 @@ func handleConnection(conn net.Conn, errOut io.Writer, tracker *forwardTracker) 
 
 	if tracker != nil {
 		if port, ok := shouldForward(line); ok {
-			fmt.Fprintf(errOut, "opener: detected localhost port %q, requesting forward\n", port)
 			tracker.forward(port)
 		}
 	}

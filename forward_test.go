@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os/exec"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -150,25 +153,40 @@ func TestShouldForward(t *testing.T) {
 }
 
 func TestForwardTrackerCleanup(t *testing.T) {
-	// Test that cleanup() removes expired entries and keeps non-expired.
-	// We don't exec ssh; we only check that the active map is updated.
-	// forward() would need to run ssh; we test cleanup in isolation by
-	// populating active directly and calling cleanup with a short TTL.
-	ft := newForwardTracker("/nonexistent/socket", 100*time.Millisecond, io.Discard)
-	ft.mu.Lock()
-	ft.active["11111"] = time.Now().Add(-200 * time.Millisecond) // expired
-	ft.active["22222"] = time.Now().Add(-50 * time.Millisecond)  // not expired
-	ft.mu.Unlock()
-
-	ft.cleanup()
-
-	ft.mu.Lock()
-	defer ft.mu.Unlock()
-	if _, ok := ft.active["11111"]; ok {
-		t.Error("expired entry 11111 should have been removed")
+	tt := []struct {
+		name            string
+		cancelCmd       string // "true" (exit 0) or "false" (exit 1)
+		expiredRemoved  bool
+	}{
+		{"cancel succeeds", "true", true},
+		{"cancel fails", "false", false},
 	}
-	if _, ok := ft.active["22222"]; !ok {
-		t.Error("non-expired entry 22222 should remain")
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			ft := newForwardTracker("/unused", 100*time.Millisecond, io.Discard)
+			ft.sshControlCmdFunc = func(ctx context.Context, op, port string) *exec.Cmd {
+				return exec.Command(tc.cancelCmd)
+			}
+			ft.mu.Lock()
+			ft.active["11111"] = time.Now().Add(-200 * time.Millisecond) // expired
+			ft.active["22222"] = time.Now().Add(-50 * time.Millisecond)  // not expired
+			ft.mu.Unlock()
+
+			ft.cleanup()
+
+			ft.mu.Lock()
+			defer ft.mu.Unlock()
+			_, expiredExists := ft.active["11111"]
+			if tc.expiredRemoved && expiredExists {
+				t.Error("expired entry 11111 should be removed after successful cancel")
+			}
+			if !tc.expiredRemoved && !expiredExists {
+				t.Error("expired entry 11111 should remain when ssh cancel fails")
+			}
+			if _, ok := ft.active["22222"]; !ok {
+				t.Error("non-expired entry 22222 should remain")
+			}
+		})
 	}
 }
 
@@ -193,7 +211,28 @@ func TestForwardTrackerForwardLogsError(t *testing.T) {
 	var buf bytes.Buffer
 	ft := newForwardTracker("/nonexistent/control/socket", time.Minute, &buf)
 	ft.forward("12345")
-	if buf.Len() == 0 {
-		t.Error("expected error to be logged when ssh fails")
+	if !strings.Contains(buf.String(), "opener: ssh forward -L") {
+		t.Errorf("expected forward error log, got: %s", buf.String())
+	}
+}
+
+func TestForwardTrackerForwardDedup(t *testing.T) {
+	var calls atomic.Int32
+	ft := newForwardTracker("/unused", time.Minute, io.Discard)
+	ft.sshControlCmdFunc = func(ctx context.Context, op, port string) *exec.Cmd {
+		calls.Add(1)
+		return exec.Command("true")
+	}
+
+	ft.forward("12345")
+	ft.forward("12345")
+
+	if n := calls.Load(); n != 1 {
+		t.Errorf("expected ssh to be called once, got %d", n)
+	}
+	ft.mu.Lock()
+	defer ft.mu.Unlock()
+	if _, ok := ft.active["12345"]; !ok {
+		t.Error("port should remain in active map")
 	}
 }

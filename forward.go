@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -72,65 +73,85 @@ func loopbackPort(u *url.URL) string {
 }
 
 type forwardTracker struct {
-	mu            sync.Mutex
-	active        map[string]time.Time // port -> last forwarded time
-	controlSocket string
-	ttl           time.Duration
-	errOut        io.Writer
+	mu         sync.Mutex
+	active     map[string]time.Time // port -> last forwarded time
+	ttl        time.Duration
+	errOut     io.Writer
+	sshControlCmdFunc func(ctx context.Context, operation, port string) *exec.Cmd
 }
 
 func newForwardTracker(controlSocket string, ttl time.Duration, errOut io.Writer) *forwardTracker {
 	return &forwardTracker{
-		active:        make(map[string]time.Time),
-		controlSocket: controlSocket,
-		ttl:           ttl,
-		errOut:        errOut,
+		active: make(map[string]time.Time),
+		ttl:    ttl,
+		errOut: errOut,
+		sshControlCmdFunc: func(ctx context.Context, op, port string) *exec.Cmd {
+			return exec.CommandContext(ctx, "ssh", "-S", controlSocket, "-O", op, "-L", port+":localhost:"+port, "none")
+		},
 	}
 }
 
 func (ft *forwardTracker) forward(port string) {
-	ctx, cancel := context.WithTimeout(context.Background(), sshForwardTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "ssh", "-S", ft.controlSocket, "-O", "forward", "-L", port+":localhost:"+port, "none")
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	err := cmd.Run()
 	ft.mu.Lock()
-	if err != nil {
-		if ft.errOut != nil {
-			fmt.Fprintf(ft.errOut, "opener: ssh forward -L %s:localhost:%s: %v\n", port, port, err)
-		}
+	if _, exists := ft.active[port]; exists {
+		ft.active[port] = time.Now()
 		ft.mu.Unlock()
+		if ft.errOut != nil {
+			fmt.Fprintf(ft.errOut, "opener: port %s already forwarded, refreshing TTL\n", port)
+		}
 		return
 	}
+	// Mark the port as in-progress to prevent duplicate ssh execs.
 	ft.active[port] = time.Now()
 	ft.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), sshForwardTimeout)
+	defer cancel()
+	cmd := ft.sshControlCmdFunc(ctx, "forward", port)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	if err != nil {
+		ft.mu.Lock()
+		delete(ft.active, port)
+		ft.mu.Unlock()
+		if ft.errOut != nil {
+			fmt.Fprintf(ft.errOut, "opener: ssh forward -L %s:localhost:%s: %v: %s\n", port, port, err, stderr.String())
+		}
+		return
+	}
+
 	if ft.errOut != nil {
 		fmt.Fprintf(ft.errOut, "opener: forwarded -L %s:localhost:%s\n", port, port)
 	}
 }
 
+func (ft *forwardTracker) cancelForward(port string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), sshForwardTimeout)
+	defer cancel()
+	cmd := ft.sshControlCmdFunc(ctx, "cancel", port)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%w: %s", err, stderr.String())
+	}
+	return nil
+}
+
 func (ft *forwardTracker) cleanup() {
 	ft.mu.Lock()
-	expired := make([]string, 0)
+	defer ft.mu.Unlock()
+
 	now := time.Now()
 	for port, ts := range ft.active {
-		if now.Sub(ts) > ft.ttl {
-			expired = append(expired, port)
+		if now.Sub(ts) <= ft.ttl {
+			continue
 		}
-	}
-	for _, port := range expired {
-		delete(ft.active, port)
-	}
-	ft.mu.Unlock()
-
-	for _, port := range expired {
-		ctx, cancel := context.WithTimeout(context.Background(), sshForwardTimeout)
-		cmd := exec.CommandContext(ctx, "ssh", "-S", ft.controlSocket, "-O", "cancel", "-L", port+":localhost:"+port, "none")
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		err := cmd.Run()
-		cancel()
+		err := ft.cancelForward(port)
+		if err == nil {
+			delete(ft.active, port)
+		}
 		if ft.errOut != nil {
 			if err != nil {
 				fmt.Fprintf(ft.errOut, "opener: ssh cancel -L %s:localhost:%s: %v\n", port, port, err)
@@ -144,6 +165,7 @@ func (ft *forwardTracker) cleanup() {
 func (ft *forwardTracker) run(ctx context.Context) {
 	ticker := time.NewTicker(cleanupInterval)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
