@@ -1,0 +1,4 @@
+network: unix
+address: ~/.opener.sock
+auto-forward-control-socket: ~/.ssh/ctrl-socket
+auto-forward-ttl: 5m

@@ -99,7 +99,52 @@ network: unix
 
 # The address to listen on. (defaults to ~/.opener.sock)
 address: ~/.opener.sock
+
+# SSH control socket for automatic port forwarding (optional, see below).
+auto-forward-control-socket: ~/.ssh/cm_socket/my-remote
+
+# How long to keep a forwarded port before cleaning it up. (defaults to 1m)
+auto-forward-ttl: 60s
 ```
+
+### Automatic SSH port forwarding
+
+Some URLs opened through opener point to `localhost` on a non-standard port.
+This is common with OAuth callback flows where a CLI tool like `az login` or
+`gcloud auth login` starts a temporary local HTTP server (for example
+`http://localhost:38947/callback`). When you are working on a remote server
+over SSH, these URLs fail because the port is not forwarded.
+
+If you set `auto-forward-control-socket` in your config, opener will detect localhost URLs
+with non-standard ports and automatically set up SSH port forwards using your
+existing SSH connection. This works for both direct localhost URLs and localhost
+URLs embedded in query parameters (like `redirect_uri`).
+
+Forwards are cleaned up automatically after `auto-forward-ttl` (default 1 minute).
+
+To use this feature:
+
+1. Enable SSH connection sharing with a static control socket path in your `~/.ssh/config`:
+
+```
+Host my-remote
+  ControlMaster auto
+  ControlPath ~/.ssh/cm_socket/my-remote
+  ControlPersist 60m
+```
+
+2. Add the same path to your opener config (`~/.config/opener/config.yaml`):
+
+```yaml
+auto-forward-control-socket: ~/.ssh/cm_socket/my-remote
+auto-forward-ttl: 60s
+```
+
+When opener receives a URL like
+`https://login.example.com/?redirect_uri=http%3A%2F%2Flocalhost%3A54123%2Fcallback`,
+it will run `ssh -S ~/.ssh/cm_socket/my-remote -O forward -L 54123:localhost:54123 none`
+before opening the URL in your browser. After `auto-forward-ttl` elapses the port
+forward is removed with `ssh -O cancel`.
 
 ### Example: Open a URL from inside a container
 
