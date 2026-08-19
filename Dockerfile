@@ -1,4 +1,4 @@
-FROM --platform=${BUILDPLATFORM} golang:1.24 AS base
+FROM --platform=${BUILDPLATFORM} golang:1.27 AS base
 WORKDIR /src
 ENV CGO_ENABLED=0
 COPY go.* .
