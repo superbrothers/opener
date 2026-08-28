@@ -19,7 +19,7 @@ RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     go test -v ./...
 
-FROM golangci/golangci-lint:v1.64.8 AS lint-base
+FROM golangci/golangci-lint:v2.13.2 AS lint-base
 FROM base AS lint
 RUN --mount=target=. \
     --mount=from=lint-base,src=/usr/bin/golangci-lint,target=/usr/bin/golangci-lint \
