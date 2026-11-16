@@ -13,7 +13,7 @@ build:
 TOOLS_BIN_DIR := $(CURDIR)/hack/tools/bin
 $(shell mkdir -p $(TOOLS_BIN_DIR))
 
-GORELEASER_VERSION ?= v2.8.1
+GORELEASER_VERSION ?= v2.20.1
 GORELEASER := $(TOOLS_BIN_DIR)/goreleaser
 
 $(GORELEASER):
